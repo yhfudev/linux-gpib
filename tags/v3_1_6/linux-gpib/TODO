@@ -1,0 +1,30 @@
+cleanup and improve organization of code - lots of work to do here
+
+parallel polls (ibppc)
+
+add support for chip-specific enhancements to generic nec7210/tms9914 support
+
+generally make this software suck less
+
+fix crash on pcmcia card removal when program has board open
+
+fix reporting of read errors
+
+break up huge dependency files so make isn't so slow
+
+Write a macro for printing debugging messages, have library parse 
+dmesg automatically on error
+
+report error when user tries to read/write to interface board which is
+bus master
+
+add send_eoi option for config file
+
+make sure all necessary cleanups are done on close
+
+implement/fix serial autopolling
+
+get rid of global timeout variable
+
+check that REN is asserted when it should be
+
