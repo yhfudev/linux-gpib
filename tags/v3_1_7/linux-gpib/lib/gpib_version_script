@@ -1,0 +1,41 @@
+
+GPIB_DUMMY_VERSION {
+	global:
+		ThreadIbsta;
+		ThreadIberr;
+		ThreadIbcnt;
+		ThreadIbcntl;
+		ibask;
+		ibcac;
+		ibclr;
+		ibcmd;
+		ibcnt;
+		ibconfig;
+		ibdev;
+		ibdma;
+		ibeos;
+		ibeot;
+		iberr;
+		ibevent;
+		ibfind;
+		ibgts;
+		iblines;
+		ibloc;
+		ibonl;
+		ibpad;
+		ibppc;
+		ibrd;
+		ibrpp;
+		ibrsp;
+		ibrsv;
+		ibsad;
+		ibsic;
+		ibsre;
+		ibsta;
+		ibtmo;
+		ibtrg;
+		ibwait;
+		ibwrt;
+	local: *;
+};
+
