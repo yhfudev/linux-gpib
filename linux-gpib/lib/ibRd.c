@@ -61,7 +61,7 @@ int InternalReceiveSetup( ibConf_t *conf, Addr4882_t address )
 	return 0;
 }
 
-ssize_t read_data(ibConf_t *conf, uint8_t *buffer, size_t count, size_t *bytes_read)
+ssize_t read_data( ibConf_t *conf, uint8_t *buffer, size_t count )
 {
 	ibBoard_t *board;
 	read_write_ioctl_t read_cmd;
@@ -75,6 +75,7 @@ ssize_t read_data(ibConf_t *conf, uint8_t *buffer, size_t count, size_t *bytes_r
 	read_cmd.end = 0;
 	
 	set_timeout( board, conf->settings.usec_timeout );
+
 	conf->end = 0;
 
 	retval = ioctl( board->fileno, IBRD, &read_cmd );
@@ -89,16 +90,15 @@ ssize_t read_data(ibConf_t *conf, uint8_t *buffer, size_t count, size_t *bytes_r
 				setIberr( EDVR );
 				break;
 		}
+		return retval;
 	}
 
 	if( read_cmd.end ) conf->end = 1;
 
-	*bytes_read = read_cmd.count;
-
-	return retval;
+	return read_cmd.count;
 }
 
-ssize_t my_ibrd( ibConf_t *conf, uint8_t *buffer, size_t count, size_t *bytes_read)
+ssize_t my_ibrd( ibConf_t *conf, uint8_t *buffer, size_t count )
 {
 	// set eos mode
 	iblcleos( conf );
@@ -112,24 +112,25 @@ ssize_t my_ibrd( ibConf_t *conf, uint8_t *buffer, size_t count, size_t *bytes_re
 		}
 	}
 
-	return read_data(conf, buffer, count, bytes_read);
+	return read_data( conf, buffer, count );
 }
 
 int ibrd(int ud, void *rd, long cnt)
 {
 	ibConf_t *conf;
-	ssize_t retval, bytes_read;
+	ssize_t count;
 
 	conf = enter_library( ud );
 	if( conf == NULL )
 		return exit_library( ud, 1 );
 
-	retval = my_ibrd( conf, rd, cnt, &bytes_read);
-	setIbcnt(bytes_read);
-	if(retval < 0)
+	count = my_ibrd( conf, rd, cnt );
+	if( count < 0 )
 	{
 		return exit_library( ud, 1 );
 	}
+
+	setIbcnt( count );
 
 	return general_exit_library( ud, 0, 0, 0, DCAS, 0, 0 );
 }
@@ -188,10 +189,14 @@ int ibrdf(int ud, const char *file_path )
 	do
 	{
 		int fwrite_count;
-		int bytes_read;
-		
-		retval = read_data(conf, buffer, sizeof(buffer), &bytes_read);
-		fwrite_count = fwrite( buffer, 1, bytes_read, save_file );
+
+		retval = read_data( conf, buffer, sizeof( buffer ) );
+		if( retval < 0 )
+		{
+			error++;
+			break;
+		}
+		fwrite_count = fwrite( buffer, 1, retval, save_file );
 		if( fwrite_count != retval )
 		{
 			setIberr( EFSO );
@@ -199,11 +204,6 @@ int ibrdf(int ud, const char *file_path )
 			error++;
 		}
 		byte_count += fwrite_count;
-		if( retval < 0 )
-		{
-			error++;
-			break;
-		}
 	}while( conf->end == 0 && error == 0 );
 
 	setIbcnt( byte_count );
@@ -224,8 +224,7 @@ int InternalRcvRespMsg( ibConf_t *conf, void *buffer, long count, int terminatio
 	ibBoard_t *board;
 	int retval;
 	int use_eos;
-	size_t bytes_read;
-	
+
 	if( conf->is_interface == 0 )
 	{
 		setIberr( EDVR );
@@ -256,12 +255,13 @@ int InternalRcvRespMsg( ibConf_t *conf, void *buffer, long count, int terminatio
 		return retval;
 	}
 
-	retval = read_data(conf, buffer, count, &bytes_read);
-	setIbcnt(bytes_read);
+	retval = read_data( conf, buffer, count );
 	if(retval < 0)
 	{
 		return -1;
 	}
+
+	setIbcnt(retval);
 
 	return 0;
 }

@@ -11,15 +11,11 @@
  */
 int iblines( const gpib_board_t *board, short *lines)
 {
-	int retval;
-	
-	*lines = 0;
 	if( board->interface->line_status == NULL )
 	{
+		*lines = 0;
 		return 0;
 	}
-	retval = board->interface->line_status( board );
-	if(retval < 0) return retval;
-	*lines = retval;
+	*lines = board->interface->line_status( board );
 	return 0;
 }

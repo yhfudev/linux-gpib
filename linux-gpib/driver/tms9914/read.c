@@ -37,13 +37,13 @@ void check_for_eos( tms9914_private_t *priv, uint8_t byte )
 		write_byte( priv, AUX_RHDF, AUXCR );
 }
 
-static ssize_t pio_read(gpib_board_t *board, tms9914_private_t *priv, uint8_t *buffer, size_t length, int *nbytes)
+static ssize_t pio_read(gpib_board_t *board, tms9914_private_t *priv, uint8_t *buffer, size_t length)
 {
+	size_t count = 0;
 	ssize_t retval = 0;
 	unsigned long flags;
 
-	*nbytes = 0;
-	while(*nbytes < length)
+	while(count < length)
 	{
 		if(wait_event_interruptible(board->wait,
 			test_bit( READ_READY_BN, &priv->state ) ||
@@ -67,25 +67,25 @@ static ssize_t pio_read(gpib_board_t *board, tms9914_private_t *priv, uint8_t *b
 
 		spin_lock_irqsave( &board->spinlock, flags );
 		clear_bit( READ_READY_BN, &priv->state );
-		buffer[ (*nbytes)++ ] = read_byte( priv, DIR );
+		buffer[ count++ ] = read_byte( priv, DIR );
 		spin_unlock_irqrestore( &board->spinlock, flags );
 
-		check_for_eos( priv, buffer[ *nbytes - 1 ] );
+		check_for_eos( priv, buffer[ count - 1 ] );
 
 		if( test_bit( RECEIVED_END_BN, &priv->state ) )
 			break;
 	}
 
-	return retval;
+	return retval ? retval : count;
 }
 
-ssize_t tms9914_read(gpib_board_t *board, tms9914_private_t *priv, uint8_t *buffer, size_t length, int *end, int *nbytes)
+ssize_t tms9914_read(gpib_board_t *board, tms9914_private_t *priv, uint8_t *buffer, size_t length, int *end)
 {
+	size_t	count = 0;
 	ssize_t retval = 0;
-	int bytes_read;
-	
+
 	*end = 0;
-	*nbytes = 0;
+
 	if(length == 0) return 0;
 
 	clear_bit( DEV_CLEAR_BN, &priv->state );
@@ -106,10 +106,11 @@ ssize_t tms9914_read(gpib_board_t *board, tms9914_private_t *priv, uint8_t *buff
 	if(length)
 	{
 		// PIO transfer
-		retval = pio_read(board, priv, buffer, length, &bytes_read);
-		*nbytes += bytes_read;
+		retval = pio_read(board, priv, buffer, length);
 		if(retval < 0)
 			return retval;
+		else
+			count += retval;
 	}
 
 	// read last byte if we havn't received an END yet
@@ -118,16 +119,17 @@ ssize_t tms9914_read(gpib_board_t *board, tms9914_private_t *priv, uint8_t *buff
 		// make sure we holdoff after last byte read
 		write_byte(priv, AUX_HLDE, AUXCR);
 		write_byte(priv, AUX_HLDA | AUX_CS, AUXCR);
-		retval = pio_read(board, priv, &buffer[*nbytes], 1, &bytes_read);
-		*nbytes += bytes_read;
+		retval = pio_read(board, priv, &buffer[count], 1);
 		if(retval < 0)
 			return retval;
+		else
+			count++;
 	}
 
 	if(test_and_clear_bit(RECEIVED_END_BN, &priv->state))
 		*end = 1;
 
-	return 0;
+	return count;
 }
 
 EXPORT_SYMBOL(tms9914_read);

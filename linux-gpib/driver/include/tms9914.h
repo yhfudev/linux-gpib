@@ -19,7 +19,6 @@
 #define _TMS9914_H
 
 #include <linux/types.h>
-#include <linux/interrupt.h>
 #include <gpib_types.h>
 
 /* struct used to provide variables local to a tms9914 chip */
@@ -35,7 +34,7 @@ struct tms9914_private_struct
 	volatile uint8_t admr_bits;
 	volatile uint8_t auxa_bits;	// bits written to auxilliary register A
 	// used to keep track of board's state, bit definitions given below
-	volatile unsigned long state;
+	volatile int state;
 	uint8_t eos;	// eos character
 	short eos_flags;
 	volatile uint8_t spoll_status;
@@ -76,7 +75,7 @@ enum
 
 // interface functions
 ssize_t tms9914_read(gpib_board_t *board, tms9914_private_t *priv,
-	uint8_t *buffer, size_t length, int *end, int *nbytes);
+	uint8_t *buffer, size_t length, int *end);
 ssize_t tms9914_write(gpib_board_t *board, tms9914_private_t *priv,
 	uint8_t *buffer, size_t length, int send_eoi);
 ssize_t tms9914_command(gpib_board_t *board, tms9914_private_t *priv,
@@ -120,8 +119,8 @@ uint8_t tms9914_iomem_read_byte(tms9914_private_t *priv, unsigned int register_n
 void tms9914_iomem_write_byte(tms9914_private_t *priv, uint8_t data, unsigned int register_num);
 
 // interrupt service routine
-irqreturn_t tms9914_interrupt(gpib_board_t *board, tms9914_private_t *priv );
-irqreturn_t tms9914_interrupt_have_status(gpib_board_t *board, tms9914_private_t *priv, int status1,
+void tms9914_interrupt(gpib_board_t *board, tms9914_private_t *priv );
+void tms9914_interrupt_have_status(gpib_board_t *board, tms9914_private_t *priv, int status1,
 		int status2);
 
 // tms9914 has 8 registers
@@ -219,9 +218,9 @@ enum adsr_bits
 enum adr_bits
 {
 	ADDRESS_MASK = 0x1f,	/* mask to specify lower 5 bits for ADR */
-	HR_DAT = ( 1 << 5 ),   /* disable talker */
-	HR_DAL = ( 1 << 6 ),   /* disable listener */
-	HR_EDPA = ( 1 << 7 ),   /* enable dual primary addressing */
+	HR_DAT = ( 1 << 5 ),   /*        */
+	HR_DAL = ( 1 << 6 ),   /*        */
+	HR_EDPA = ( 1 << 7 ),   /*        */
 };
 
 enum bus_status_bits
@@ -243,13 +242,13 @@ enum bus_status_bits
 enum aux_cmd_bits
 {
 	AUX_CS = 0x80,	/* set bit instead of clearing it, used with commands marked 'd' below */
-	AUX_CHIP_RESET = 0x0,	/* d Chip reset                   */
+	AUX_CR = 0x0,	/* d Chip reset                   */
 	AUX_INVAL = 0x1,	// release dac holdoff, invalid command byte
 	AUX_VAL = ( AUX_INVAL | AUX_CS ),	// release dac holdoff, valid command byte
 	AUX_RHDF = 0x2,	/* X Release RFD holdoff          */
 	AUX_HLDA = 0x3,	/* d holdoff on all data          */
 	AUX_HLDE = 0x4,	/* d holdoff on EOI only          */
-	AUX_NBAF = 0x5,	/* X Set new byte availiable false */
+	AUX_NBAF = 0x5,	/* X Set ne byte availiable false */
 	AUX_FGET = 0x6,	/* d force GET                    */
 	AUX_RTL = 0x7,	/* d return to local              */
 	AUX_SEOI = 0x8,	/* X send EOI with next byte      */

@@ -71,15 +71,10 @@ ssize_t fifo_write( gpib_board_t *board, uint8_t *buffer, size_t length )
 	ssize_t retval = 0;
 	cb7210_private_t *cb_priv = board->private_data;
 	nec7210_private_t *nec_priv = &cb_priv->nec7210_priv;
-	unsigned long iobase = cb_priv->fifo_iobase;
+	unsigned long iobase = nec_priv->iobase;
 	unsigned int num_bytes, i;
 	unsigned long flags;
 
-	if(iobase == 0)
-	{
-		printk("cb7210: fifo iobase is zero!\n");
-		return -EIO;
-	}
 	if( length == 0 ) return 0;
 
 	clear_bit( DEV_CLEAR_BN, &nec_priv->state );

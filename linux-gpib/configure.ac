@@ -1,7 +1,7 @@
 
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT([linux-gpib], [3.2.01.cvs])
+AC_INIT([linux-gpib], [3.1.101])
 AC_CONFIG_SRCDIR([driver/sys/osfuncs.c])
 AM_INIT_AUTOMAKE
 
@@ -57,11 +57,13 @@ if [[ ! -f "$LINUX_SRCDIR/.config" ]]; then
 	appropriate configuration file to $LINUX_SRCDIR/.config and then run 'make oldconfig'
 	in the kernel source directory.])
 fi
+if [[ ! -f "$LINUX_SRCDIR/.hdepend" ]];then
+	AC_MSG_ERROR([You need to run 'make dep' on the kernel source before continuing.])
+fi
 AC_MSG_RESULT([ok])
 dnl get compile flags for modules from linux kernel source tree
 AC_MSG_CHECKING([Linux kernel compile flags])
-FLAGDIR=$(pwd)/util/linux_flags 
-make --quiet -C ${LINUX_SRCDIR} V=1 SUBDIRS=${FLAGDIR} LINUXDIR=${LINUX_SRCDIR} MODVERDIR=${FLAGDIR} modules 
+(cd util/linux_flags/ && make --quiet LINUXDIR=$LINUX_SRCDIR)
 if [[ $? != 0 ]]; then
 	AC_MSG_ERROR([Failed to get compile flags from Linux kernel directory.])
 fi
@@ -180,9 +182,6 @@ AC_OUTPUT([\
 	language/php/TESTS/Makefile \
 	language/python/Makefile \
 	language/tcl/Makefile \
-	usb/Makefile \
-	usb/ni_usb_gpib/Makefile \
-	usb/agilent_82357a/Makefile \
 ]
 )
 

@@ -25,7 +25,6 @@
 
 #include <linux/config.h>
 #include <linux/delay.h>
-#include <linux/interrupt.h>
 
 enum
 {
@@ -40,7 +39,6 @@ typedef struct
 	struct pci_dev *pci_device;
 	// base address of amccs5933 pci chip
 	unsigned long amcc_iobase;
-	unsigned long fifo_iobase;
 	unsigned int irq;
 	volatile uint8_t hs_mode_bits;
 	volatile unsigned out_fifo_half_empty : 1;
@@ -54,15 +52,15 @@ extern gpib_interface_t cb_pcmcia_interface;
 extern gpib_interface_t cb_pcmcia_accel_interface;
 
 // interrupt service routines
-irqreturn_t cb_pci_interrupt(int irq, void *arg, struct pt_regs *registerp);
-irqreturn_t cb7210_interrupt(int irq, void *arg, struct pt_regs *registerp);
-irqreturn_t cb7210_internal_interrupt( gpib_board_t *board );
+void cb_pci_interrupt(int irq, void *arg, struct pt_regs *registerp);
+void cb7210_interrupt(int irq, void *arg, struct pt_regs *registerp);
+void cb7210_internal_interrupt( gpib_board_t *board );
 
 // interface functions
 ssize_t cb7210_read( gpib_board_t *board, uint8_t *buffer, size_t length,
-	int *end, int *nbytes);
+	int *end );
 ssize_t cb7210_accel_read( gpib_board_t *board, uint8_t *buffer, size_t length,
-	int *end, int *nbytes);
+	int *end );
 ssize_t cb7210_write( gpib_board_t *board, uint8_t *buffer, size_t length,
 	int send_eoi );
 ssize_t cb7210_accel_write( gpib_board_t *board, uint8_t *buffer, size_t length,

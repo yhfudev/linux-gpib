@@ -24,14 +24,14 @@ static int autospoll_thread(void *board_void)
 {
 	gpib_board_t *board = board_void;
 	int retval = 0;
-	
+
 	lock_kernel();
 	/* This thread doesn't need any user-level access,
 	 * so get rid of all our resources..
 	 */
+	daemonize();
 	/* set our name for identification purposes */
-	daemonize("gpib%d_autospoll", board->minor);
-	allow_signal(SIGKILL);
+	sprintf(current->comm, "gpib%d_autospoll", board->minor);
 	unlock_kernel();
 
 	GPIB_DPRINTK("entering autospoll thread\n" );
@@ -60,12 +60,7 @@ static int autospoll_thread(void *board_void)
 			continue;
 		}
 
-		if(try_module_get(board->provider_module))
-		{
-			retval = autopoll_all_devices(board);
-			module_put(board->provider_module);
-		}else
-			printk("gpib%i: %s: try_module_get() failed!\n", board->minor, __FUNCTION__);
+		retval = autopoll_all_devices(board);
 		if(retval <= 0)
 		{
 			board->stuck_srq = 1;	// XXX could be better
@@ -73,8 +68,9 @@ static int autospoll_thread(void *board_void)
 		}
 		up(&board->autopoll_mutex);
 	}
-	printk("gpib%i: exiting autospoll thread\n", board->minor);
+
 	up(&board->autospoll_completion);
+	GPIB_DPRINTK("exiting autospoll thread\n" );
 	return retval;
 }
 
@@ -97,7 +93,6 @@ int ibonline( gpib_board_t *board )
 	if(board->autospoll_pid < 0)
 	{
 		printk("gpib: failed to create autospoll thread\n");
-		board->interface->detach(board);
 		return board->autospoll_pid;
 	}
 	board->online = 1;
@@ -106,7 +101,7 @@ int ibonline( gpib_board_t *board )
 	return 0;
 }
 
-/* XXX need to make sure board is generally not in use (grab board lock?) */
+/* XXX need to make sure board is generaly not in use (grab board lock?) */
 int iboffline( gpib_board_t *board )
 {
 	int retval;

@@ -38,10 +38,10 @@ void cb_pci_detach(gpib_board_t *board);
 void cb_isa_detach(gpib_board_t *board);
 
 // wrappers for interface functions
-ssize_t cb7210_read(gpib_board_t *board, uint8_t *buffer, size_t length, int *end, int *nbytes)
+ssize_t cb7210_read(gpib_board_t *board, uint8_t *buffer, size_t length, int *end)
 {
 	cb7210_private_t *priv = board->private_data;
-	return nec7210_read(board, &priv->nec7210_priv, buffer, length, end, nbytes);
+	return nec7210_read(board, &priv->nec7210_priv, buffer, length, end);
 }
 ssize_t cb7210_write(gpib_board_t *board, uint8_t *buffer, size_t length, int send_eoi)
 {
@@ -169,6 +169,7 @@ gpib_interface_t cb_pci_interface =
 	serial_poll_status: cb7210_serial_poll_status,
 	t1_delay: cb7210_t1_delay,
 	return_to_local: cb7210_return_to_local,
+	provider_module: &__this_module,
 };
 
 gpib_interface_t cb_pci_accel_interface =
@@ -197,6 +198,7 @@ gpib_interface_t cb_pci_accel_interface =
 	serial_poll_status: cb7210_serial_poll_status,
 	t1_delay: cb7210_t1_delay,
 	return_to_local: cb7210_return_to_local,
+	provider_module: &__this_module,
 };
 
 gpib_interface_t cb_isa_interface =
@@ -225,6 +227,7 @@ gpib_interface_t cb_isa_interface =
 	serial_poll_status: cb7210_serial_poll_status,
 	t1_delay: cb7210_t1_delay,
 	return_to_local: cb7210_return_to_local,
+	provider_module: &__this_module,
 };
 
 gpib_interface_t cb_isa_accel_interface =
@@ -253,6 +256,7 @@ gpib_interface_t cb_isa_accel_interface =
 	serial_poll_status: cb7210_serial_poll_status,
 	t1_delay: cb7210_t1_delay,
 	return_to_local: cb7210_return_to_local,
+	provider_module: &__this_module,
 };
 
 int cb7210_allocate_private(gpib_board_t *board)
@@ -361,15 +365,14 @@ int cb_pci_attach(gpib_board_t *board)
 		return -1;
 	}
 
-	if(pci_request_regions(cb_priv->pci_device, "cb7210"))
+	if(pci_request_regions(cb_priv->pci_device, "pci-gpib"))
 		return -1;
 
 	cb_priv->amcc_iobase = pci_resource_start( cb_priv->pci_device, 0 );
 	nec_priv->iobase = pci_resource_start( cb_priv->pci_device, 1 );
-	cb_priv->fifo_iobase = pci_resource_start( cb_priv->pci_device, 2 );
 
 	isr_flags |= SA_SHIRQ;
-	if(request_irq(cb_priv->pci_device->irq, cb_pci_interrupt, isr_flags, "cb7210", board))
+	if(request_irq(cb_priv->pci_device->irq, cb_pci_interrupt, isr_flags, "pci-gpib", board))
 	{
 		printk( "cb7210: can't request IRQ %d\n",cb_priv->pci_device->irq );
 		return -1;
@@ -420,16 +423,14 @@ int cb_isa_attach(gpib_board_t *board)
 
 	retval = cb7210_generic_attach(board);
 	if(retval) return retval;
-	cb_priv = board->private_data;
-	nec_priv = &cb_priv->nec7210_priv;
-	if(request_region(board->ibbase, cb7210_iosize, "cb7210") == 0)
+
+	if( request_region(board->ibbase, cb7210_iosize, "isa-gpib") == 0 );
 	{
-		printk("gpib: ioports starting at 0x%lx are already in use\n", board->ibbase);
-		return -EIO;
+		printk("gpib: ioports are already in use");
+		return -1;
 	}
 	nec_priv->iobase = board->ibbase;
-	cb_priv->fifo_iobase = nec_priv->iobase;
-	
+
 	bits = irq_bits( board->ibirq );
 	if( bits == 0 )
 	{
@@ -437,10 +438,10 @@ int cb_isa_attach(gpib_board_t *board)
 	}
 
 	// install interrupt handler
-	if(request_irq(board->ibirq, cb7210_interrupt, isr_flags, "cb7210", board))
+	if(request_irq(board->ibirq, cb7210_interrupt, isr_flags, "isa-gpib", board))
 	{
 		printk("gpib: can't request IRQ %d\n", board->ibirq);
-		return -EBUSY;
+		return -1;
 	}
 	cb_priv->irq = board->ibirq;
 
@@ -473,14 +474,16 @@ static int cb7210_init_module( void )
 {
 	int err = 0;
 
-	gpib_register_driver(&cb_pci_interface, &__this_module);
-	gpib_register_driver(&cb_isa_interface, &__this_module);
-	gpib_register_driver(&cb_pci_accel_interface, &__this_module);
-	gpib_register_driver(&cb_isa_accel_interface, &__this_module);
+	EXPORT_NO_SYMBOLS;
+
+	gpib_register_driver(&cb_pci_interface);
+	gpib_register_driver(&cb_isa_interface);
+	gpib_register_driver(&cb_pci_accel_interface);
+	gpib_register_driver(&cb_isa_accel_interface);
 
 #if defined(GPIB_CONFIG_PCMCIA)
-	gpib_register_driver(&cb_pcmcia_interface, &__this_module);
-	gpib_register_driver(&cb_pcmcia_accel_interface, &__this_module);
+	gpib_register_driver(&cb_pcmcia_interface);
+	gpib_register_driver(&cb_pcmcia_accel_interface);
 	err += cb_pcmcia_init_module();
 #endif
 	if(err)

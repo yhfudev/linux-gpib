@@ -104,8 +104,6 @@ void nec7210_request_system_control( gpib_board_t *board, nec7210_private_t *pri
 {
 	if( request_control == 0 )
 	{
-		write_byte( priv, AUX_CREN, AUXMR );
-		write_byte( priv, AUX_CIFC, AUXMR );
 		write_byte( priv, AUX_DSC, AUXMR );
 	}
 }

@@ -38,7 +38,7 @@ extern gpib_interface_t cec_pci_interface;
 extern gpib_interface_t cec_pcmcia_interface;
 
 // interface functions
-ssize_t cec_read(gpib_board_t *board, uint8_t *buffer, size_t length, int *end, int*nbytes);
+ssize_t cec_read(gpib_board_t *board, uint8_t *buffer, size_t length, int *end);
 ssize_t cec_write(gpib_board_t *board, uint8_t *buffer, size_t length, int send_eoi);
 ssize_t cec_command(gpib_board_t *board, uint8_t *buffer, size_t length);
 int cec_take_control(gpib_board_t *board, int synchronous);
@@ -58,7 +58,7 @@ void cec_serial_poll_response( gpib_board_t *board, uint8_t status );
 void cec_return_to_local( gpib_board_t *board );
 
 // interrupt service routines
-irqreturn_t cec_interrupt(int irq, void *arg, struct pt_regs *registerp);
+void cec_interrupt(int irq, void *arg, struct pt_regs *registerp);
 
 // utility functions
 void cec_free_private(gpib_board_t *board);

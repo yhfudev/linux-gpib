@@ -1,9 +1,8 @@
 /***************************************************************************
-                              cec/interrupt.c
+                          lib/ibSdbg.c
                              -------------------
 
-    begin                : Dec 2001
-    copyright            : (C) 2001, 2002 by Frank Mori Hess
+    copyright            : (C) 2001,2002,2003 by Frank Mori Hess
     email                : fmhess@users.sourceforge.net
  ***************************************************************************/
 
@@ -16,22 +15,9 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "cec.h"
-#include <asm/bitops.h>
-#include <asm/dma.h>
+#include "ib_internal.h"
 
-/*
- * GPIB interrupt service routines
- */
-
-void cec_interrupt(int irq, void *arg, struct pt_regs *registerp)
+int ibSdbg(int ud,int mode)
 {
-	gpib_board_t *board = arg;
-	cec_private_t *priv = board->private_data;
-	unsigned long flags;
-
-	spin_lock_irqsave( &board->spinlock, flags );
-	nec7210_interrupt(board, &priv->nec7210_priv);
-	spin_unlock_irqrestore( &board->spinlock, flags );
+  return ibBoardFunc( CONF(ud,board),IBSDBG, mode );
 }
-

@@ -36,10 +36,10 @@ int hp82335_attach( gpib_board_t *board );
 void hp82335_detach( gpib_board_t *board );
 
 // wrappers for interface functions
-ssize_t hp82335_read( gpib_board_t *board, uint8_t *buffer, size_t length, int *end, int *nbytes)
+ssize_t hp82335_read( gpib_board_t *board, uint8_t *buffer, size_t length, int *end )
 {
 	hp82335_private_t *priv = board->private_data;
-	return tms9914_read( board, &priv->tms9914_priv, buffer, length, end, nbytes);
+	return tms9914_read( board, &priv->tms9914_priv, buffer, length, end );
 }
 ssize_t hp82335_write( gpib_board_t *board, uint8_t *buffer, size_t length, int send_eoi )
 {
@@ -167,6 +167,7 @@ gpib_interface_t hp82335_interface =
 	serial_poll_response: hp82335_serial_poll_response,
 	t1_delay: hp82335_t1_delay,
 	return_to_local: hp82335_return_to_local,
+	provider_module: &__this_module,
 };
 
 int hp82335_allocate_private( gpib_board_t *board )
@@ -259,7 +260,7 @@ int hp82335_attach( gpib_board_t *board )
 	printk("hp82335: base address 0x%x remapped to 0x%lx\n", hp_priv->raw_iobase,
 		tms_priv->iobase );
 
-	if(request_irq( board->ibirq, hp82335_interrupt, SA_SHIRQ, "hp82335", board))
+	if( request_irq( board->ibirq, hp82335_interrupt, SA_SHIRQ, "hp82335", board ) )
 	{
 		printk( "hp82335: can't request IRQ %d\n", board->ibirq );
 		return -1;
@@ -306,7 +307,10 @@ void hp82335_detach(gpib_board_t *board)
 
 static int hp82335_init_module( void )
 {
-	gpib_register_driver(&hp82335_interface, &__this_module);
+	EXPORT_NO_SYMBOLS;
+
+	gpib_register_driver(&hp82335_interface);
+
 	return 0;
 }
 
@@ -322,20 +326,22 @@ module_exit( hp82335_exit_module );
  * GPIB interrupt service routines
  */
 
-irqreturn_t hp82335_interrupt(int irq, void *arg, struct pt_regs *registerp)
+void hp82335_interrupt(int irq, void *arg, struct pt_regs *registerp)
 {
 	int status1, status2;
 	gpib_board_t *board = arg;
 	hp82335_private_t *priv = board->private_data;
 	unsigned long flags;
-	irqreturn_t retval;
-	
+
 	spin_lock_irqsave( &board->spinlock, flags );
+
 	status1 = read_byte( &priv->tms9914_priv, ISR0);
 	status2 = read_byte( &priv->tms9914_priv, ISR1);
+
 	hp82335_clear_interrupt( priv );
-	retval = tms9914_interrupt_have_status(board, &priv->tms9914_priv, status1, status2);
+
+	tms9914_interrupt_have_status(board, &priv->tms9914_priv, status1, status2);
+
 	spin_unlock_irqrestore( &board->spinlock, flags );
-	return retval;
 }
 

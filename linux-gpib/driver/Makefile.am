@@ -7,33 +7,30 @@
 #   the Free Software Foundation; either version 2 of the License, or
 #   (at your option) any later version.
 
-GPIB_MODULE_SUBDIRS :=agilent_82350b agilent_82357a cb7210 cec hp82335 ines nec7210 pc2 sys tms9914 tnt4882 ni_usb 
+GPIB_MODULE_SUBDIRS :=cb7210 cec hp82335 ines nec7210 pc2 sys tms9914 tnt4882
 GPIB_ABS_MODULE_SUBDIRS :=$(patsubst %, @abs_srcdir@/%/, $(GPIB_MODULE_SUBDIRS))
-GPIB_MODULES :=cb7210/cb7210.ko cec/cec_gpib.ko hp82335/hp82335.ko \
-	ines/ines_gpib.ko pc2/pc2_gpib.ko tnt4882/tnt4882.ko \
-	ni_usb/ni_usb_gpib.ko agilent_82350b/agilent_82350b.ko agilent_82357a/agilent_82357a.ko \
-	nec7210/nec7210.ko tms9914/tms9914.ko sys/gpib_common.ko
+GPIB_MODULES :=cb7210/cb7210.o cec/cec_gpib.o hp82335/hp82335.o \
+	ines/ines_gpib.o pc2/pc2_gpib.o tms9914/tms9914.o tnt4882/tnt4882.o \
+	nec7210/nec7210.o tms9914/tms9914.o sys/gpib_common.o
 
 EXTRA_DIST = $(GPIB_MODULE_SUBDIRS) tnt4882-tms
-GPIB_MODVERDIR=@abs_srcdir@/.tmp_versions
+
 SUBDIRS = include
 
 -include $(top_srcdir)/util/linux_flags/flags
 
-all-local: 
-	$(RM) $(GPIB_MODVERDIR)/*
-	$(MAKE) -C $(LINUX_SRCDIR) V=1 modules\
-		CC="$(LINUX_CC) -I@abs_top_srcdir@ -I@abs_top_srcdir@/driver/include -I@abs_top_srcdir@/include" \
-		SUBDIRS="$(GPIB_ABS_MODULE_SUBDIRS)" \
-		MODVERDIR="$(GPIB_MODVERDIR)"
+all-local:
+	$(MAKE) -C $(LINUX_SRCDIR) modules V=1 \
+		CC="$(CC_LINUX) -I@abs_top_srcdir@ -I@abs_top_srcdir@/driver/include -I@abs_top_srcdir@/include" \
+		SUBDIRS="$(GPIB_ABS_MODULE_SUBDIRS)"
 
 clean-local:
-	find $(srcdir) \( -name '*.[oas]' -o -name '*.ko' -o -name core -o -name '.*.cmd' \) -type f \
+	find $(srcdir) \( -name '*.[oas]' -o -name core -o -name '.*.flags' \) -type f \
 		-exec $(RM) {} \;
 
 install-data-hook: device-file-check /etc/gpib.conf
 	for module in $(GPIB_MODULES) ; do \
-		$(INSTALL_DATA) -D $$module $(LINUX_MODLIB)/gpib/$$(basename $$module) ; \
+		$(INSTALL_DATA) -D $$module $(MODLIB_LINUX)/gpib/$$(basename $$module) ; \
 	done
 	$(DEPMOD) -ae
 
@@ -42,7 +39,7 @@ install-data-hook: device-file-check /etc/gpib.conf
 	for i in $(shell seq 0 15); \
 	do \
 		mknod --mode u=rw,g=rw,o= /dev/gpib$${i} c $(IBMAJOR) $${i} || exit 1; \
-		chown root:gpib /dev/gpib$${i}; \
+		chown root.gpib /dev/gpib$${i}; \
 	done
 
 .PHONY : device-file-check
@@ -65,7 +62,7 @@ device-file-check: /dev/gpib0
 /etc/gpib.conf:
 	$(INSTALL_DATA) -D $(top_srcdir)/util/templates/gpib.conf /etc/gpib.conf
 
-#make sure compiled files, etc don't make it into distribution tarballs
+#make sure compiled files don't make it into distribution tarballs
 dist-hook:
-	find $(distdir) \( -name '*.[oas]' -o -name '*.ko' -o -name core -o -name '.*.cmd' \) -type f \
+	find $(distdir) \( -name '*.[oas]' -o -name core -o -name '.*.flags' \) -type f \
 		-exec $(RM) {} \;

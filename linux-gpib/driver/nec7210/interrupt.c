@@ -40,7 +40,7 @@ static inline short nec7210_atn_has_changed(gpib_board_t *board, nec7210_private
 /*
  *  interrupt service routine
  */
-irqreturn_t nec7210_interrupt( gpib_board_t *board, nec7210_private_t *priv )
+void nec7210_interrupt( gpib_board_t *board, nec7210_private_t *priv )
 {
 	int status1, status2;
 
@@ -48,10 +48,10 @@ irqreturn_t nec7210_interrupt( gpib_board_t *board, nec7210_private_t *priv )
 	status1 = read_byte(priv, ISR1);
 	status2 = read_byte(priv, ISR2);
 
-	return nec7210_interrupt_have_status( board, priv, status1, status2 );
+	nec7210_interrupt_have_status( board, priv, status1, status2 );
 }
 
-irqreturn_t nec7210_interrupt_have_status( gpib_board_t *board,
+void nec7210_interrupt_have_status( gpib_board_t *board,
 	nec7210_private_t *priv, int status1, int status2 )
 {
 	unsigned long dma_flags;
@@ -156,14 +156,8 @@ irqreturn_t nec7210_interrupt_have_status( gpib_board_t *board,
 
 	if( status1 & HR_DEC )
 	{
-		unsigned short address_status_bits = read_byte(priv, ADSR);
-
-		// ignore device clear events if we are controller in charge
-		if((address_status_bits & HR_CIC) == 0)
-		{
-			push_gpib_event( board, EventDevClr );
-			set_bit( DEV_CLEAR_BN, &priv->state );
-		}
+		push_gpib_event( board, EventDevClr );
+		set_bit( DEV_CLEAR_BN, &priv->state );
 	}
 
 	if( status1 & HR_DET )
@@ -180,7 +174,6 @@ irqreturn_t nec7210_interrupt_have_status( gpib_board_t *board,
 		update_status_nolock(board, priv);
 		wake_up_interruptible(&board->wait); /* wake up sleeping process */
 	}
-	return IRQ_HANDLED;
 }
 
 EXPORT_SYMBOL(nec7210_interrupt);

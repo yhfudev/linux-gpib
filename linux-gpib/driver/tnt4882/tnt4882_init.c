@@ -39,14 +39,14 @@ void ni_isa_detach(gpib_board_t *board);
 void ni_pci_detach(gpib_board_t *board);
 
 // wrappers for interface functions
-ssize_t tnt4882_read(gpib_board_t *board, uint8_t *buffer, size_t length, int *end, int *nbytes)
+ssize_t tnt4882_read(gpib_board_t *board, uint8_t *buffer, size_t length, int *end)
 {
 	tnt4882_private_t *priv = board->private_data;
 	nec7210_private_t *nec_priv = &priv->nec7210_priv;
 	ssize_t retval;
 	int dummy;
 
-	retval = nec7210_read(board, &priv->nec7210_priv, buffer, length, end, nbytes);
+	retval = nec7210_read(board, &priv->nec7210_priv, buffer, length, end);
 
 	if( retval < 0 )
 	{	// force immediate holdoff
@@ -81,17 +81,12 @@ void tnt4882_request_system_control( gpib_board_t *board, int request_control )
 {
 	tnt4882_private_t *priv = board->private_data;
 
-	if(request_control)
-	{
-		tnt_writeb( priv, SETSC, CMDR );
-		udelay(1);
-	}
 	nec7210_request_system_control( board, &priv->nec7210_priv, request_control );
-	if(!request_control)
-	{
+	if( request_control )
+		tnt_writeb( priv, SETSC, CMDR );
+	else
 		tnt_writeb( priv, CLRSC, CMDR );
-		udelay(1);
-	}
+	udelay(1);
 }
 void tnt4882_interface_clear(gpib_board_t *board, int assert)
 {
@@ -186,6 +181,7 @@ gpib_interface_t ni_pci_interface =
 	serial_poll_status: tnt4882_serial_poll_status,
 	t1_delay: tnt4882_t1_delay,
 	return_to_local: tnt4882_return_to_local,
+	provider_module: &__this_module,
 };
 
 gpib_interface_t ni_pci_accel_interface =
@@ -214,6 +210,7 @@ gpib_interface_t ni_pci_accel_interface =
 	serial_poll_status: tnt4882_serial_poll_status,
 	t1_delay: tnt4882_t1_delay,
 	return_to_local: tnt4882_return_to_local,
+	provider_module: &__this_module,
 };
 
 gpib_interface_t ni_isa_interface =
@@ -242,6 +239,7 @@ gpib_interface_t ni_isa_interface =
 	serial_poll_status: tnt4882_serial_poll_status,
 	t1_delay: tnt4882_t1_delay,
 	return_to_local: tnt4882_return_to_local,
+	provider_module: &__this_module,
 };
 
 gpib_interface_t ni_nat4882_isa_interface =
@@ -270,6 +268,7 @@ gpib_interface_t ni_nat4882_isa_interface =
 	serial_poll_status: tnt4882_serial_poll_status,
 	t1_delay: tnt4882_t1_delay,
 	return_to_local: tnt4882_return_to_local,
+	provider_module: &__this_module,
 };
 
 gpib_interface_t ni_nec_isa_interface =
@@ -298,6 +297,7 @@ gpib_interface_t ni_nec_isa_interface =
 	serial_poll_status: tnt4882_serial_poll_status,
 	t1_delay: tnt4882_t1_delay,
 	return_to_local: tnt4882_return_to_local,
+	provider_module: &__this_module,
 };
 
 gpib_interface_t ni_isa_accel_interface =
@@ -326,6 +326,7 @@ gpib_interface_t ni_isa_accel_interface =
 	serial_poll_status: tnt4882_serial_poll_status,
 	t1_delay: tnt4882_t1_delay,
 	return_to_local: tnt4882_return_to_local,
+	provider_module: &__this_module,
 };
 
 gpib_interface_t ni_nat4882_isa_accel_interface =
@@ -354,6 +355,7 @@ gpib_interface_t ni_nat4882_isa_accel_interface =
 	serial_poll_status: tnt4882_serial_poll_status,
 	t1_delay: tnt4882_t1_delay,
 	return_to_local: tnt4882_return_to_local,
+	provider_module: &__this_module,
 };
 
 gpib_interface_t ni_nec_isa_accel_interface =
@@ -382,6 +384,7 @@ gpib_interface_t ni_nec_isa_accel_interface =
 	serial_poll_status: tnt4882_serial_poll_status,
 	t1_delay: tnt4882_t1_delay,
 	return_to_local: tnt4882_return_to_local,
+	provider_module: &__this_module,
 };
 
 void tnt4882_board_reset( tnt4882_private_t *tnt_priv, gpib_board_t *board )
@@ -495,9 +498,7 @@ int ni_pci_attach(gpib_board_t *board)
 	for(tnt_priv->mite = mite_devices; tnt_priv->mite; tnt_priv->mite = tnt_priv->mite->next)
 	{
 		if( mite_device_id( tnt_priv->mite ) == PCI_DEVICE_ID_NI_GPIB ||
-			mite_device_id( tnt_priv->mite ) == PCI_DEVICE_ID_NI_GPIB_PLUS ||
-			mite_device_id( tnt_priv->mite ) == PCI_DEVICE_ID_NI_PXIGPIB ||
-			mite_device_id( tnt_priv->mite ) == PCI_DEVICE_ID_NI_PMCGPIB )
+			mite_device_id( tnt_priv->mite ) == PCI_DEVICE_ID_NI_GPIB_PLUS )
 		{
 			if( board->pci_bus >=0 && board->pci_bus !=
 				tnt_priv->mite->pcidev->bus->number )
@@ -559,30 +560,32 @@ void ni_pci_detach(gpib_board_t *board)
 	tnt4882_free_private(board);
 }
 
-int ni_isapnp_find( struct pnp_dev **dev )
+int ni_isapnp_find( struct pci_dev **dev )
 {
-	*dev = pnp_find_dev( NULL, ISAPNP_VENDOR_ID_NI,
+	*dev = isapnp_find_dev( NULL, ISAPNP_VENDOR_ID_NI,
 		ISAPNP_FUNCTION( ISAPNP_ID_NI_ATGPIB_TNT ), NULL );
-	if(*dev == NULL || (*dev)->card == NULL)
+	if( *dev == NULL )
 	{
 		printk( "tnt4882: failed to find isapnp board\n" );
 		return -ENODEV;
 	}
-	if(pnp_device_attach(*dev) < 0)
- 	{
-		printk( "tnt4882: atgpib/tnt board already active, skipping\n" );
+	if( (*dev)->active )
+	{
+		printk( "tnt4882: atgpib/tnt board already active, aborting\n" );
 		return -EBUSY;
 	}
-	if(pnp_activate_dev(*dev) < 0 )
+	if( (*dev)->prepare( *dev ) < 0 )
 	{
-		pnp_device_detach(*dev);
-		printk( "tnt4882: failed to activate() atgpib/tnt, aborting\n" );
+		printk( "tnt4882: failed to prepare() atgpib/tnt, aborting\n" );
 		return -EAGAIN;
 	}
-	if(!pnp_port_valid(*dev, 0) || !pnp_irq_valid(*dev, 0))
+	if( (*dev)->ro )
 	{
-		pnp_device_detach(*dev);
-		printk( "tnt4882: invalid port or irq for atgpib/tnt, aborting\n" );
+		printk( "tnt4882: atgpib/tnt board is read only?\n" );
+	}
+	if( (*dev)->activate( *dev ) < 0 )
+	{
+		printk( "tnt4882: failed to activate() atgpib/tnt, aborting\n" );
 		return -ENOMEM;
 	}
 	return 0;
@@ -613,14 +616,14 @@ int ni_isa_attach_common( gpib_board_t *board, enum nec7210_chipset chipset )
 	// look for plug-n-play board
 	if( board->ibbase == 0 )
 	{
-		struct pnp_dev *dev;
+		struct pci_dev *dev;
 		int retval;
 
 		retval = ni_isapnp_find( &dev );
 		if( retval < 0 ) return retval;
-		tnt_priv->pnp_dev = dev;
-		iobase = pnp_port_start(dev, 0);
-		board->ibirq = pnp_irq(dev, 0);
+		tnt_priv->isapnp_dev = dev;
+		iobase = dev->resource[ 0 ].start;
+		board->ibirq = dev->irq_resource[ 0 ].start;
 	}else
 		iobase = board->ibbase;
 
@@ -680,27 +683,27 @@ void ni_isa_detach(gpib_board_t *board)
 		{
 			release_region(nec_priv->iobase, atgpib_iosize);
 		}
-		if(tnt_priv->pnp_dev)
-		{			
-			pnp_device_detach(tnt_priv->pnp_dev);
-		}
+		if( tnt_priv->isapnp_dev )
+			tnt_priv->isapnp_dev->deactivate( tnt_priv->isapnp_dev );
 	}
 	tnt4882_free_private(board);
 }
 
 static int tnt4882_init_module( void )
 {
-	gpib_register_driver(&ni_isa_interface, &__this_module);
-	gpib_register_driver(&ni_isa_accel_interface, &__this_module);
-	gpib_register_driver(&ni_nat4882_isa_interface, &__this_module);
-	gpib_register_driver(&ni_nat4882_isa_accel_interface, &__this_module);
-	gpib_register_driver(&ni_nec_isa_interface, &__this_module);
-	gpib_register_driver(&ni_nec_isa_accel_interface, &__this_module);
-	gpib_register_driver(&ni_pci_interface, &__this_module);
-	gpib_register_driver(&ni_pci_accel_interface, &__this_module);
+	EXPORT_NO_SYMBOLS;
+
+	gpib_register_driver(&ni_isa_interface);
+	gpib_register_driver(&ni_isa_accel_interface);
+	gpib_register_driver(&ni_nat4882_isa_interface);
+	gpib_register_driver(&ni_nat4882_isa_accel_interface);
+	gpib_register_driver(&ni_nec_isa_interface);
+	gpib_register_driver(&ni_nec_isa_accel_interface);
+	gpib_register_driver(&ni_pci_interface);
+	gpib_register_driver(&ni_pci_accel_interface);
 #if defined(GPIB_CONFIG_PCMCIA)
-	gpib_register_driver(&ni_pcmcia_interface, &__this_module);
-	gpib_register_driver(&ni_pcmcia_accel_interface, &__this_module);
+	gpib_register_driver(&ni_pcmcia_interface);
+	gpib_register_driver(&ni_pcmcia_accel_interface);
 	if( init_ni_gpib_cs() < 0 )
 		return -1;
 #endif

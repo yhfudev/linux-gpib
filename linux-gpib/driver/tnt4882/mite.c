@@ -72,10 +72,7 @@ void mite_init(void)
 	struct pci_dev *pcidev;
 	struct mite_struct *mite;
 
-	for(pcidev = pci_find_device(PCI_ANY_ID,PCI_ANY_ID,NULL);
-		pcidev;
-		pcidev = pci_find_device(PCI_ANY_ID,PCI_ANY_ID, pcidev))
-	{
+	pci_for_each_dev(pcidev){
 		if(pcidev->vendor==PCI_VENDOR_ID_NATINST){
 			mite=kmalloc(sizeof(*mite),GFP_KERNEL);
 			if(!mite){

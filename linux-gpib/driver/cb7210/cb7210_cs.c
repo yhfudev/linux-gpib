@@ -76,24 +76,20 @@ MODULE_PARM(irq_mask, "i");
 
 /*====================================================================*/
 
-static int first_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
+
+static int get_tuple(int fn, client_handle_t handle, tuple_t *tuple,
+		     cisparse_t *parse)
 {
     int i;
-    i = pcmcia_get_first_tuple(handle, tuple);
+    i = CardServices(fn, handle, tuple);
     if (i != CS_SUCCESS) return i;
-    i = pcmcia_get_tuple_data(handle, tuple);
+    i = CardServices(GetTupleData, handle, tuple);
     if (i != CS_SUCCESS) return i;
-    return pcmcia_parse_tuple(handle, tuple, parse);
+    return CardServices(ParseTuple, handle, tuple, parse);
 }
-static int next_tuple(client_handle_t handle, tuple_t *tuple, cisparse_t *parse)
-{
-    int i;
-    i = pcmcia_get_next_tuple(handle, tuple);
-    if (i != CS_SUCCESS) return i;
-    i = pcmcia_get_tuple_data(handle, tuple);
-    if (i != CS_SUCCESS) return i;
-    return pcmcia_parse_tuple(handle, tuple, parse);
-}
+
+#define first_tuple(a, b, c) get_tuple(GetFirstTuple, a, b, c)
+#define next_tuple(a, b, c) get_tuple(GetNextTuple, a, b, c)
 
 /*====================================================================*/
 
@@ -170,7 +166,15 @@ typedef struct local_info_t {
     u_short cardid;
 } local_info_t;
 
-/*====================================================================
+/*====================================================================*/
+
+static void cs_error(client_handle_t handle, int func, int ret)
+{
+    error_info_t err = { func, ret };
+    CardServices(ReportError, handle, &err);
+}
+
+/*======================================================================
 
     gpib_attach() creates an "instance" of the driver, allocating
     local data structures for one device.  The device is registered
@@ -197,6 +201,8 @@ static dev_link_t *gpib_attach(void)
 	/* Initialize the dev_link_t structure */
 	link = kmalloc(sizeof(struct dev_link_t), GFP_KERNEL);
 	memset(link, 0, sizeof(struct dev_link_t));
+	link->release.function = &gpib_release;
+	link->release.data = (u_long)link;
 
 	/* The io structure describes IO port mapping */
 	link->io.NumPorts1 = 16;
@@ -241,7 +247,7 @@ static dev_link_t *gpib_attach(void)
 	client_reg.event_handler = &gpib_event;
 	client_reg.Version = 0x0210;
 	client_reg.event_callback_args.client_data = link;
-	ret = pcmcia_register_client(&link->handle, &client_reg);
+	ret = CardServices(RegisterClient, &link->handle, &client_reg);
 	if (ret != 0) {
 		cs_error(link->handle, RegisterClient, ret);
 		gpib_detach(link);
@@ -281,26 +287,24 @@ static void gpib_detach(dev_link_t *link)
        the release() function is called, that will trigger a proper
        detach().
     */
-    if (link->state & DEV_CONFIG) 
-	{
+    if (link->state & DEV_CONFIG) {
 #ifdef PCMCIA_DEBUG
-		printk(KERN_DEBUG "gpib_cs: detach postponed, '%s' "
-			"still locked\n", link->dev->dev_name);
+	printk(KERN_DEBUG "gpib_cs: detach postponed, '%s' "
+	       "still locked\n", link->dev->dev_name);
 #endif
-		link->state |= DEV_STALE_LINK;
-		return;
-	}
+	link->state |= DEV_STALE_LINK;
+	return;
+    }
 
     /* Break the link with Card Services */
-	if (link->handle)
-		pcmcia_deregister_client(link->handle);
+    if (link->handle)
+	CardServices(DeregisterClient, link->handle);
 
-	/* Unlink device structure, free pieces */
-	*linkp = link->next;
-	if (link->priv) 
-	{
-		kfree(link->priv);
-	}
+    /* Unlink device structure, free pieces */
+    *linkp = link->next;
+    if (link->priv) {
+	kfree(link->priv);
+    }
 
 } /* gpib_detach */
 
@@ -335,14 +339,14 @@ static void gpib_config(dev_link_t *link)
 	*/
 	do {
 		tuple.DesiredTuple = CISTPL_CONFIG;
-		i = pcmcia_get_first_tuple(handle, &tuple);
+		i = CardServices(GetFirstTuple, handle, &tuple);
 		if (i != CS_SUCCESS) break;
 		tuple.TupleData = buf;
 		tuple.TupleDataMax = 64;
 		tuple.TupleOffset = 0;
-		i = pcmcia_get_tuple_data(handle, &tuple);
+		i = CardServices(GetTupleData, handle, &tuple);
 		if (i != CS_SUCCESS) break;
-		i = pcmcia_parse_tuple(handle, &tuple, &parse);
+		i = CardServices(ParseTuple, handle, &tuple, &parse);
 		if (i != CS_SUCCESS) break;
 		link->conf.ConfigBase = parse.config.base;
 	} while (0);
@@ -382,7 +386,7 @@ static void gpib_config(dev_link_t *link)
 				link->io.BasePort2 = 0;
 				link->io.NumPorts2 = 0;
 				link->conf.ConfigIndex = parse.cftable_entry.index;
-				i = pcmcia_request_io(link->handle, &link->io);
+				i = CardServices(RequestIO, link->handle, &link->io);
 				if (i == CS_SUCCESS) {
 					printk( KERN_DEBUG "gpib_cs: base=0x%x len=%d registered\n",
 						parse.cftable_entry.io.win[0].base,
@@ -406,7 +410,7 @@ static void gpib_config(dev_link_t *link)
 	   Now allocate an interrupt line.  Note that this does not
 	   actually assign a handler to the interrupt.
 	*/
-	i = pcmcia_request_irq(link->handle, &link->irq);
+	i = CardServices(RequestIRQ, link->handle, &link->irq);
 	if (i != CS_SUCCESS) {
 	    cs_error(link->handle, RequestIRQ, i);
 	    break;
@@ -418,7 +422,7 @@ static void gpib_config(dev_link_t *link)
 	   This actually configures the PCMCIA socket -- setting up
 	   the I/O windows and the interrupt mapping.
 	*/
-	i = pcmcia_request_configuration(link->handle, &link->conf);
+	i = CardServices(RequestConfiguration, link->handle, &link->conf);
 	if (i != CS_SUCCESS) {
 	    cs_error(link->handle, RequestConfiguration, i);
 	    break;
@@ -477,16 +481,16 @@ static void gpib_release(u_long arg)
     /* Unlink the device chain */
     link->dev = NULL;
     
-	/* Don't bother checking to see if these succeed or not */
-	pcmcia_release_window(link->win);
-	pcmcia_release_configuration(link->handle);
-	pcmcia_release_io(link->handle, &link->io);
-	pcmcia_release_irq(link->handle, &link->irq);
-	link->state &= ~DEV_CONFIG;
+    /* Don't bother checking to see if these succeed or not */
+    CardServices(ReleaseWindow, link->win);
+    CardServices(ReleaseConfiguration, link->handle);
+    CardServices(ReleaseIO, link->handle, &link->io);
+    CardServices(ReleaseIRQ, link->handle, &link->irq);
+    link->state &= ~DEV_CONFIG;
 
-	if (link->state & DEV_STALE_LINK)
-		gpib_detach(link);
-	
+    if (link->state & DEV_STALE_LINK)
+	gpib_detach(link);
+    
 } /* gpib_release */
 
 /*======================================================================
@@ -523,7 +527,8 @@ static int gpib_event(event_t event, int priority,
     case CS_EVENT_CARD_REMOVAL:
 	link->state &= ~DEV_PRESENT;
 	if (link->state & DEV_CONFIG) {
-		gpib_release((u_long)link);
+//			((local_info_t *)link->priv)->stop = 1;
+			mod_timer(&link->release, jiffies + HZ/20);
 	}
 	break;
     case CS_EVENT_CARD_INSERTION:
@@ -535,29 +540,20 @@ static int gpib_event(event_t event, int priority,
 	/* Fall through... */
     case CS_EVENT_RESET_PHYSICAL:
 	if (link->state & DEV_CONFIG)
-	    pcmcia_release_configuration(link->handle);
+	    CardServices(ReleaseConfiguration, link->handle);
 	break;
     case CS_EVENT_PM_RESUME:
 	link->state &= ~DEV_SUSPEND;
 	/* Fall through... */
     case CS_EVENT_CARD_RESET:
 	if (link->state & DEV_CONFIG)
-	    pcmcia_request_configuration(link->handle, &link->conf);
+	    CardServices(RequestConfiguration, link->handle, &link->conf);
 	break;
     }
     return 0;
 } /* gpib_event */
 
 /*====================================================================*/
-static struct pcmcia_driver cb_gpib_cs_driver =
-{
-	.attach = gpib_attach,
-	.detach = gpib_detach,
-	.owner = THIS_MODULE,
-	.drv = {
-		.name = "cb_gpib_cs",
-	},
-};
 
 int cb_pcmcia_init_module(void)
 {
@@ -566,13 +562,13 @@ int cb_pcmcia_init_module(void)
     if (pc_debug)
 	printk(KERN_INFO "%s\n", version);
 #endif
-    pcmcia_get_card_services_info(&serv);
+    CardServices(GetCardServicesInfo, &serv);
     if (serv.Revision != CS_RELEASE_CODE) {
 	printk(KERN_NOTICE "gpib: Card Services release "
 	       "does not match!\n");
 	return -1;
     }
-    pcmcia_register_driver(&cb_gpib_cs_driver);
+    register_pcmcia_driver(&dev_info, &gpib_attach, &gpib_detach);
     return 0;
 }
 
@@ -582,7 +578,7 @@ void cb_pcmcia_cleanup_module(void)
     if (pc_debug)
 	printk(KERN_DEBUG "gpib_cs: unloading\n");
 #endif
-    pcmcia_unregister_driver(&cb_gpib_cs_driver);
+    unregister_pcmcia_driver(&dev_info);
     while (dev_list != NULL) {
 	if (dev_list->state & DEV_CONFIG)
 	    gpib_release((u_long)dev_list);
@@ -619,6 +615,7 @@ gpib_interface_t cb_pcmcia_interface =
 	serial_poll_status: cb7210_serial_poll_status,
 	t1_delay: cb7210_t1_delay,
 	return_to_local: cb7210_return_to_local,
+	provider_module: &__this_module,
 };
 
 gpib_interface_t cb_pcmcia_accel_interface =
@@ -647,6 +644,7 @@ gpib_interface_t cb_pcmcia_accel_interface =
 	serial_poll_status: cb7210_serial_poll_status,
 	t1_delay: cb7210_t1_delay,
 	return_to_local: cb7210_return_to_local,
+	provider_module: &__this_module,
 };
 
 int cb_pcmcia_attach( gpib_board_t *board )
@@ -668,7 +666,6 @@ int cb_pcmcia_attach( gpib_board_t *board )
 	nec_priv = &cb_priv->nec7210_priv;
 
 	nec_priv->iobase = dev_list->io.BasePort1;
-	cb_priv->fifo_iobase = nec_priv->iobase;
 
 	if(request_irq(dev_list->irq.AssignedIRQ, cb7210_interrupt, SA_SHIRQ,
 		"cb7210", board))

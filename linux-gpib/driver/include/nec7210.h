@@ -21,7 +21,6 @@
 #include <linux/types.h>
 #include <linux/spinlock.h>
 #include <linux/string.h>
-#include <linux/interrupt.h>
 
 #include "gpib_types.h"
 
@@ -49,7 +48,7 @@ struct nec7210_private_struct
 	volatile uint8_t auxa_bits;	// bits written to auxilliary register A
 	volatile uint8_t auxb_bits;	// bits written to auxilliary register B
 	// used to keep track of board's state, bit definitions given below
-	volatile unsigned long state;
+	volatile int state;
 	/* lock for chips that extend the nec7210 registers by paging in alternate regs */
 	spinlock_t register_page_lock;
 	// wrappers for outb, inb, readb, or writeb
@@ -91,7 +90,7 @@ enum
 
 // interface functions
 ssize_t nec7210_read(gpib_board_t *board, nec7210_private_t *priv,
-	uint8_t *buffer, size_t length, int *end, int *nbytes);
+	uint8_t *buffer, size_t length, int *end);
 ssize_t nec7210_write(gpib_board_t *board, nec7210_private_t *priv,
 	uint8_t *buffer, size_t length, int send_eoi);
 ssize_t nec7210_command(gpib_board_t *board, nec7210_private_t *priv,
@@ -144,8 +143,8 @@ uint8_t nec7210_locking_iomem_read_byte(nec7210_private_t *priv, unsigned int re
 void nec7210_locking_iomem_write_byte(nec7210_private_t *priv, uint8_t data, unsigned int register_num);
 
 // interrupt service routine
-irqreturn_t nec7210_interrupt(gpib_board_t *board, nec7210_private_t *priv);
-irqreturn_t nec7210_interrupt_have_status( gpib_board_t *board,
+void nec7210_interrupt(gpib_board_t *board, nec7210_private_t *priv);
+void nec7210_interrupt_have_status( gpib_board_t *board,
 	nec7210_private_t *priv, int status1, int status2 );
 
 // nec7210 has 8 registers

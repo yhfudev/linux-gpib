@@ -24,7 +24,6 @@
 #include "plx9050.h"
 #include "amcc5920.h"
 #include <linux/config.h>
-#include <linux/interrupt.h>
 
 enum ines_pci_chip
 {
@@ -55,9 +54,9 @@ extern gpib_interface_t ines_pcmcia_interface;
 extern gpib_interface_t ines_pcmcia_accel_interface;
 
 // interface functions
-ssize_t ines_read(gpib_board_t *board, uint8_t *buffer, size_t length, int *end, int *nbytes);
+ssize_t ines_read(gpib_board_t *board, uint8_t *buffer, size_t length, int *end);
 ssize_t ines_write(gpib_board_t *board, uint8_t *buffer, size_t length, int send_eoi);
-ssize_t ines_accel_read(gpib_board_t *board, uint8_t *buffer, size_t length, int *end, int *nbytes);
+ssize_t ines_accel_read(gpib_board_t *board, uint8_t *buffer, size_t length, int *end);
 ssize_t ines_accel_write(gpib_board_t *board, uint8_t *buffer, size_t length, int send_eoi);
 ssize_t ines_command(gpib_board_t *board, uint8_t *buffer, size_t length);
 int ines_take_control(gpib_board_t *board, int synchronous);
@@ -80,7 +79,7 @@ unsigned int ines_t1_delay( gpib_board_t *board, unsigned int nano_sec );
 void ines_return_to_local( gpib_board_t *board );
 
 // interrupt service routines
-irqreturn_t ines_interrupt(int irq, void *arg, struct pt_regs *registerp);
+void ines_interrupt(int irq, void *arg, struct pt_regs *registerp);
 
 // utility functions
 void ines_free_private(gpib_board_t *board);
