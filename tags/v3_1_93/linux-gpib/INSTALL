@@ -1,0 +1,129 @@
+
+Installing Linux-GPIB
+--------------------------------------------------------------------
+
+Supported Hardware:
+---------------------------------------------------------------------
+
+See the file named drivers.txt
+
+------------------------------------------------------------------------
+
+Important Note:
+
+You'll need the 'dialog' or 'whiptail' package installed on your system 
+to run the installation scripts correctly.
+
+-------------------------------------------------------------------------
+
+
+A) First steps:
+---------------
+
+o) Installing your Hardware:
+	If you have an old ISA board it may need to be configured by setting
+	the appropriate board jumpers or switches
+	for its base-address, interrupt-level (IRQ) and dma-request channel (DMA).
+	Please choose a free base-address, irq and dma for your system
+	(refer to your
+	hardware documentation for this). Take a look to /proc/interrupts
+	or /proc/dma
+	for already used interrupt and dma lines. Now shut down your system and
+	install the board in your computer.
+
+o) Unpacking the Software:
+	Choose a directory on your system where linux-gpib should reside,
+	cd to this directory and unpack the archives with the 'tar' program.
+
+	You will also need the linux kernel source code, which the linux-gpib
+	package reads for header files and compilation variables when compiling
+	the gpib kernel module.  Ideally, you have the linux source your
+	current kernel was compiled from, or are willing to compile
+	a fresh kernel.  Otherwise, you can prepare a kernel source tree that matches
+	the kernel you are currently running if you have its config file (in
+	the Debian distibution the config files for the kernel-image packages
+	are in the /boot directory).  Perform the following steps:
+	1) Get a copy of the kernel source that matches the kernel you are
+		running.  Unpack it and copy your kernel config file to '.config'
+		in the top directory of your kernel source.  Note: you will need
+		to have write permission to your kernel source
+		directory the first time you run 'make config' in your
+		linux-gpib directory (see below), so it might be easiest to unpack
+		the kernel source into a user-owned directory.
+	2) You might need to edit the file 'Makefile' in the kernel source.
+		At the top of the Makefile, the variable EXTRAVERSION is defined.
+		If necessary, change it to match your kernel (for example, if the command
+		'uname -r' produces "2.4.16-386" then your EXTRAVERSION should be
+		set as 'EXTRAVERSION=-386'.
+	3) run 'make oldconfig' in your kernel source directory.
+	4) run 'make dep' in the kernel source directory.
+
+o) Installing additional Software:
+	If you want to use TCL language support for the GPIB system
+	you have to get the newest TCL version and install it on your system.
+	The GPIB module can be loaded with the dynamic link facility
+	using
+
+	load <path>/libgpib-tcl.so
+
+
+B) Installing Linux-GPIB
+-------------------------
+
+o) cd to your linux-gpib directory and type 'make config'.  If you
+	have old files you want to clean up, do a 'make clean' first.
+	You will be prompted for the path to your linux kernel source,
+	and which gpib drivers you wish to compile.
+
+	Type 'make'.  Now the Package will be compiled.
+
+	Type 'make install' (as root).  This will copy the kernel driver to
+	/lib/modules/<kernel version>/misc as well as install the library
+	and headers files into /usr/local.  Make sure the directory you installed
+	the shared library to (/usr/local/lib) is listed in your /etc/ld.so.conf file,
+	so that ld can find libgpib.so.  If it is not listed, add it and then run 'ldconfig'.
+	 Lastly the configuration utility looks
+	for linux-gpib related files on your system and asks if you wish to create
+	them if there aren't any.
+
+	To give a user access to the computer's gpib board you will have to add
+	them to the group 'gpib' (you can use the 'usermod' tool to change the
+	groups a user belongs to).  Or, you could change the
+	permissions on the device files /dev/gpib[0-15] to something you like
+	better, using 'chmod' (or editing devfsd.conf if you are using devfs).
+
+C) Loading the driver module
+-----------------------------
+
+	You can load the driver module by typing
+
+		modprobe <driver name>
+
+	See the file 'drivers.txt' to see which driver your board is supported
+	by.
+
+	You can also set up the modules to load automatically by adding a line
+	something like
+
+	alias char-major-160 tnt4882
+
+	to /etc/modules.conf, which would autoload the tnt4882.o module when
+	the library is used.
+
+D) Configuring the GPIB-Library
+-------------------------------
+
+	Edit /etc/gpib.conf to match your interface board, and any devices you wish
+	to open via ibfind().  See the documentation in doc/html or doc/pdf for
+	more information.
+
+	You may find the examples/ibtest program useful as a starting point in trying
+	out your setup.
+
+E) Bindings for other languages
+-------------------------------
+
+	To compile and install bindings for Python or Tcl, enter the appropriate
+	subdirectory of the 'language' directory then 'make' and 'make install'.
+
+
