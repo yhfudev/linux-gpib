@@ -1,0 +1,43 @@
+# lib/Makefile.am
+# copyright (C) 2003 by Frank Mori Hess
+# email : fmhess@users.sourceforge.net
+#
+#   This Makefile.am is free software; you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation; either version 2 of the License, or
+#   (at your option) any later version.
+
+SUBDIRS = . gpib_config
+
+lib_LTLIBRARIES = libgpib.la
+
+noinst_HEADERS = ibConf.h ib_internal.h
+
+BUILT_SOURCES = ibConfLex.c ibConfYacc.c ibConfYacc.h
+MAINTAINERCLEANFILES = ibConfLex.c ibConfYacc.c ibConfYacc.h
+
+EXTRA_DIST = ibConfLex.l ibConfYacc.y gpib_version_script
+
+libgpib_la_SOURCES = \
+	ib.h ib_internal.h ibConf.h ibP.h parse.h \
+	ibCac.c ibClr.c ibCmd.c ibEos.c ibEot.c \
+	ibFind.c ibLines.c ibOnl.c ibPad.c ibRd.c ibRpp.c ibRsp.c ibRsv.c \
+	ibSad.c ibSic.c ibSre.c ibTmo.c ibTrg.c ibWait.c ibWrt.c \
+	ibGts.c ibBoard.c ibError.c ibutil.c globals.c ibask.c ibppc.c \
+	ibLoc.c ibDma.c ibdev.c ibbna.c async.c ibconfig.c ibFindLstn.c \
+	ibEvent.c local_lockout.c self_test.c pass_control.c ibstop.c \
+	ibConfLex.c ibConfYacc.c ibConfYacc.h
+
+libgpib_la_CFLAGS = $(LIBGPIB_CFLAGS) -DDEFAULT_CONFIG_FILE=\"/etc/gpib.conf\"
+libgpib_la_LDFLAGS = -release $(VERSION) -Wl,--version-script=$(srcdir)/gpib_version_script -lpthread
+
+ibConfLex.c: $(srcdir)/ibConfLex.l $(srcdir)/ibConfYacc.h
+	$(LEX) -Pgpib_yy -o$@ $<
+
+ibConfYacc.c + ibConfYacc.h: $(srcdir)/ibConfYacc.y
+	$(YACC) -d -p gpib_yy -o ibConfYacc.c ibConfYacc.y
+
+install-data-local:
+	$(INSTALL_HEADER) -D ib.h $(includedir)/gpib/ib.h
+
+
